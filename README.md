@@ -14,8 +14,8 @@ Một tựa game bắn phi thuyền 2D được xây dựng hoàn toàn bằng *
 Dự án sử dụng Vite làm module bundler. Để chạy dự án trên máy cá nhân, yêu cầu đã cài đặt Node.js.
 
 ```bash
-# 1. Clone dự án về máy (Nếu có link Git)
-# git clone <your-repo-url>
+# 1. Clone dự án về máy 
+# git clone <(https://github.com/sonhotrung/first-game.git)>
 
 # 2. Cài đặt các thư viện phụ thuộc
 npm install
