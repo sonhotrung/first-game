@@ -8,7 +8,6 @@ import {
   BossBullet,
 } from "../entities/GameEntities";
 
-// --- HÀM TIỆN ÍCH (UTILS) ---
 const getRandomFloat = (min, max) => Math.random() * (max - min) + min;
 const checkAabbCollision = (rect1, rect2) => {
   return (
@@ -19,18 +18,19 @@ const checkAabbCollision = (rect1, rect2) => {
   );
 };
 
-// --- COMPONENT CHÍNH ---
 const GameCanvas = () => {
   const canvasRef = useRef(null);
   const [gameState, setGameState] = useState(GAME_CONFIG.STATES.MENU);
   const [score, setScore] = useState(0);
-
-  // State lưu trữ Độ khó và Kích thước màn hình
   const [difficulty, setDifficulty] = useState("EASY");
   const [screenSize, setScreenSize] = useState({
     width: window.innerWidth,
     height: window.innerHeight,
   });
+
+  const [p1Weapon, setP1Weapon] = useState("DEFAULT");
+  const [p2Weapon, setP2Weapon] = useState("DEFAULT");
+  const [activeMode, setActiveMode] = useState("SINGLE");
 
   const engineState = useRef({
     players: [],
@@ -45,7 +45,6 @@ const GameCanvas = () => {
     enemySpawnTimer: 0,
   });
 
-  // Lắng nghe sự kiện kéo giãn cửa sổ
   useEffect(() => {
     const handleResize = () =>
       setScreenSize({ width: window.innerWidth, height: window.innerHeight });
@@ -53,22 +52,24 @@ const GameCanvas = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // VÒNG LẶP GAME CHÍNH
   useEffect(() => {
-    if (gameState !== GAME_CONFIG.STATES.PLAYING) return;
+    if (
+      gameState !== GAME_CONFIG.STATES.PLAYING &&
+      gameState !== GAME_CONFIG.STATES.TEST_WEAPONS
+    )
+      return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     let animationId;
     const engine = engineState.current;
+    const isTestMode = gameState === GAME_CONFIG.STATES.TEST_WEAPONS;
 
     const handleKeyEvent = (e, isKeyDown) => {
-      // Nhấn ESC để Tạm dừng
       if (e.code === GAME_CONFIG.KEYS.PAUSE && isKeyDown) {
         setGameState(GAME_CONFIG.STATES.PAUSED);
         return;
       }
-
       if (e.code === GAME_CONFIG.KEYS.P1.LEFT)
         engine.inputs.p1.left = isKeyDown;
       if (e.code === GAME_CONFIG.KEYS.P1.RIGHT)
@@ -90,105 +91,184 @@ const GameCanvas = () => {
 
     const onKeyDown = (e) => handleKeyEvent(e, true);
     const onKeyUp = (e) => handleKeyEvent(e, false);
-
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
 
-    // LOGIC VẬT LÝ
     const updatePhysics = () => {
-      // 1. Cập nhật Player
+      // 1. CẬP NHẬT PLAYER & BẮN ĐẠN
       engine.players.forEach((p, idx) => {
         if (!p || p.markedForDeletion) return;
         const inputStr = idx === 0 ? "p1" : "p2";
         p.update(engine.inputs[inputStr], screenSize.width);
 
-        if (p.canShoot(engine.inputs[inputStr])) {
-          engine.bullets.push(
-            new Bullet(p.position.x + p.width / 2 - 3, p.position.y),
-          );
+        const firedBulletsCount = p.canShoot(engine.inputs[inputStr]);
+        if (firedBulletsCount > 0) {
+          const weaponInfo = p.weapon;
+          for (let i = 0; i < firedBulletsCount; i++) {
+            let angleDeg = 0;
+            if (weaponInfo.spreadAngle > 0) {
+              if (firedBulletsCount > 1) {
+                const step = weaponInfo.spreadAngle / (firedBulletsCount - 1);
+                angleDeg = -weaponInfo.spreadAngle / 2 + step * i;
+              } else {
+                angleDeg = (Math.random() - 0.5) * weaponInfo.spreadAngle;
+              }
+            }
+            const angleRad = angleDeg * (Math.PI / 180);
+            const speed = Math.abs(GAME_CONFIG.BULLET_SPEED);
+            const vx = Math.sin(angleRad) * speed;
+            const vy = -Math.cos(angleRad) * speed;
+            engine.bullets.push(
+              new Bullet(
+                p.position.x + p.width / 2 - 3,
+                p.position.y,
+                weaponInfo.damage,
+                vx,
+                vy,
+                weaponInfo.color,
+                weaponInfo.maxPierce,
+              ),
+            );
+          }
         }
       });
 
-      // Kiểm tra Game Over
       if (
+        !isTestMode &&
         engine.players.filter((p) => p && !p.markedForDeletion).length === 0
       ) {
         setGameState(GAME_CONFIG.STATES.GAMEOVER);
         return;
       }
 
-      // 2. Score & Quái/Boss
-      setScore((currentScore) => {
-        if (currentScore >= GAME_CONFIG.SCORE_TO_BOSS && !engine.boss) {
-          engine.boss = new Boss(screenSize.width);
-        }
-        if (!engine.boss) {
-          engine.enemySpawnTimer++;
-          if (engine.enemySpawnTimer > 60) {
-            const maxSpawnX = Math.max(0, screenSize.width - 30);
-            engine.enemies.push(new Enemy(getRandomFloat(0, maxSpawnX), -30));
-            engine.enemySpawnTimer = 0;
+      // 2. LOGIC SPAWN QUÁI / BOSS TRỰC TIẾP
+      if (!isTestMode) {
+        setScore((currentScore) => {
+          // Khi đủ điểm -> Thả Boss thẳng xuống không cần chờ
+          if (currentScore >= GAME_CONFIG.SCORE_TO_BOSS && !engine.boss) {
+            engine.boss = new Boss(screenSize.width);
+            engine.enemies = [];
+            engine.bullets = []; // Quét sạch quái rác
+          }
+
+          if (!engine.boss) {
+            engine.enemySpawnTimer++;
+            if (engine.enemySpawnTimer > 60) {
+              let spawnHp = 3;
+              let spawnColor = "#ff4444";
+              if (currentScore >= 6000 && currentScore < 8000) {
+                spawnHp = 5;
+                spawnColor = "#ffaa00";
+              } else if (currentScore >= 8000) {
+                spawnHp = 8;
+                spawnColor = "#aa00ff";
+              }
+              engine.enemies.push(
+                new Enemy(
+                  getRandomFloat(0, Math.max(0, screenSize.width - 30)),
+                  -30,
+                  spawnHp,
+                  spawnColor,
+                ),
+              );
+              engine.enemySpawnTimer = 0;
+            }
+          }
+          return currentScore;
+        });
+
+        if (engine.boss) {
+          engine.boss.update(screenSize.width, engine.enemies);
+          if (engine.boss.canShoot())
+            engine.bossBullets.push(
+              new BossBullet(
+                engine.boss.position.x + engine.boss.width / 2 - 4,
+                engine.boss.position.y + engine.boss.height,
+              ),
+            );
+          engine.bossBullets.forEach((bb) => bb.update(screenSize.height));
+          if (engine.boss.hp <= 0) {
+            setGameState(GAME_CONFIG.STATES.VICTORY);
+            return;
           }
         }
-        return currentScore;
-      });
-
-      // 3. Boss Logic
-      if (engine.boss) {
-        engine.boss.update(screenSize.width);
-        if (engine.boss.canShoot()) {
-          engine.bossBullets.push(
-            new BossBullet(
-              engine.boss.position.x + engine.boss.width / 2 - 4,
-              engine.boss.position.y + engine.boss.height,
+      } else {
+        engine.enemySpawnTimer++;
+        if (engine.enemySpawnTimer > 40) {
+          engine.enemies.push(
+            new Enemy(
+              getRandomFloat(0, Math.max(0, screenSize.width - 30)),
+              -30,
+              8,
+              "#aa00ff",
             ),
           );
-        }
-        engine.bossBullets.forEach((bb) => bb.update(screenSize.height));
-
-        if (engine.boss.hp <= 0) {
-          setGameState(GAME_CONFIG.STATES.VICTORY);
-          return;
+          engine.enemySpawnTimer = 0;
         }
       }
 
       engine.bullets.forEach((b) => b.update());
       engine.enemies.forEach((e) => e.update(screenSize.height));
 
-      // 4. Va chạm
+      // 4. VA CHẠM (Xuyên thấu)
       engine.bullets.forEach((bullet) => {
         if (bullet.markedForDeletion) return;
         engine.enemies.forEach((enemy) => {
-          if (!enemy.markedForDeletion && checkAabbCollision(bullet, enemy)) {
-            bullet.markedForDeletion = true;
-            enemy.markedForDeletion = true;
-            if (!engine.boss) setScore((prev) => prev + 100);
+          if (
+            !enemy.markedForDeletion &&
+            !bullet.hitEntities.has(enemy) &&
+            checkAabbCollision(bullet, enemy)
+          ) {
+            bullet.hitEntities.add(enemy);
+            bullet.hitCount++;
+            let actualDamage = bullet.damage;
+            if (bullet.maxPierce > 1)
+              actualDamage = bullet.damage / Math.pow(2, bullet.hitCount - 1);
+            enemy.hp -= actualDamage;
+            if (enemy.hp <= 0) {
+              enemy.markedForDeletion = true;
+              if (!engine.boss && !isTestMode) setScore((prev) => prev + 100);
+            }
+            if (bullet.hitCount >= bullet.maxPierce)
+              bullet.markedForDeletion = true;
           }
         });
-        if (engine.boss && checkAabbCollision(bullet, engine.boss)) {
-          bullet.markedForDeletion = true;
-          engine.boss.takeDamage();
+
+        if (
+          engine.boss &&
+          !bullet.hitEntities.has(engine.boss) &&
+          checkAabbCollision(bullet, engine.boss)
+        ) {
+          bullet.hitEntities.add(engine.boss);
+          bullet.hitCount++;
+          let actualDamage = bullet.damage;
+          if (bullet.maxPierce > 1)
+            actualDamage = bullet.damage / Math.pow(2, bullet.hitCount - 1);
+          engine.boss.takeDamage(actualDamage);
+          if (bullet.hitCount >= bullet.maxPierce)
+            bullet.markedForDeletion = true;
         }
       });
 
-      engine.players.forEach((p) => {
-        if (p.markedForDeletion) return;
-        engine.enemies.forEach((enemy) => {
-          if (!enemy.markedForDeletion && checkAabbCollision(enemy, p)) {
-            enemy.markedForDeletion = true;
-            p.takeDamage();
-          }
+      if (!isTestMode) {
+        engine.players.forEach((p) => {
+          if (p.markedForDeletion) return;
+          engine.enemies.forEach((enemy) => {
+            if (!enemy.markedForDeletion && checkAabbCollision(enemy, p)) {
+              enemy.markedForDeletion = true;
+              p.takeDamage();
+            }
+          });
+          engine.bossBullets.forEach((bb) => {
+            if (!bb.markedForDeletion && checkAabbCollision(bb, p)) {
+              bb.markedForDeletion = true;
+              p.takeDamage();
+            }
+          });
+          if (engine.boss && checkAabbCollision(engine.boss, p)) p.takeDamage();
         });
-        engine.bossBullets.forEach((bb) => {
-          if (!bb.markedForDeletion && checkAabbCollision(bb, p)) {
-            bb.markedForDeletion = true;
-            p.takeDamage();
-          }
-        });
-        if (engine.boss && checkAabbCollision(engine.boss, p)) p.takeDamage();
-      });
+      }
 
-      // 5. Dọn rác
       engine.bullets = engine.bullets.filter((b) => !b.markedForDeletion);
       engine.enemies = engine.enemies.filter((e) => !e.markedForDeletion);
       engine.bossBullets = engine.bossBullets.filter(
@@ -196,15 +276,12 @@ const GameCanvas = () => {
       );
     };
 
-    // VẼ LÊN MÀN HÌNH
     const drawScreen = () => {
-      ctx.fillStyle = "#0a0a2a";
+      ctx.fillStyle = isTestMode ? "#001100" : "#0a0a2a";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-
       engine.players.forEach((p) => p && !p.markedForDeletion && p.draw(ctx));
       engine.bullets.forEach((b) => b.draw(ctx));
       engine.enemies.forEach((e) => e.draw(ctx));
-
       if (engine.boss) engine.boss.draw(ctx);
       engine.bossBullets.forEach((bb) => bb.draw(ctx));
     };
@@ -214,21 +291,51 @@ const GameCanvas = () => {
       drawScreen();
       animationId = requestAnimationFrame(gameLoop);
     };
-
     gameLoop();
-
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       cancelAnimationFrame(animationId);
     };
-  }, [gameState, screenSize, difficulty]);
+  }, [gameState, screenSize]);
 
-  // --- LOGIC KHỞI TẠO GAME ---
-  const startGame = (mode) => {
-    // Lấy cấu hình dựa vào độ khó đã chọn trên UI
+  // LUỒNG 1: Bấm Play từ Menu -> Chuyển sang chọn súng
+  const prepareGame = (mode) => {
+    setActiveMode(mode);
+    setP1Weapon("DEFAULT");
+    setP2Weapon("DEFAULT");
+
+    // Nếu là TEST, setup sẵn Player và bắn luôn, không cần qua Menu chọn súng
+    if (mode === "TEST") {
+      const diffConfig = GAME_CONFIG.DIFFICULTY[difficulty];
+      const p1 = new Player(
+        screenSize.width / 2,
+        screenSize.height,
+        "#00ff00",
+        "P1",
+        diffConfig,
+      );
+      engineState.current = {
+        players: [p1],
+        bullets: [],
+        enemies: [],
+        bossBullets: [],
+        boss: null,
+        inputs: {
+          p1: { left: false, right: false, shoot: false, reload: false },
+          p2: { left: false, right: false, shoot: false, reload: false },
+        },
+        enemySpawnTimer: 0,
+      };
+      setGameState(GAME_CONFIG.STATES.TEST_WEAPONS);
+    } else {
+      setGameState(GAME_CONFIG.STATES.WEAPON_SELECT);
+    }
+  };
+
+  // LUỒNG 2: Chốt súng -> Spawn Player -> Vào trận
+  const startGame = () => {
     const diffConfig = GAME_CONFIG.DIFFICULTY[difficulty];
-
     const p1 = new Player(
       screenSize.width / 2 + 50,
       screenSize.height,
@@ -243,7 +350,12 @@ const GameCanvas = () => {
       "P2",
       diffConfig,
     );
-    const activePlayers = mode === "SINGLE" ? [p1] : [p1, p2];
+
+    const activePlayers = activeMode === "SINGLE" ? [p1] : [p1, p2];
+
+    // Nạp súng đã chọn vào Player
+    activePlayers[0].equipWeapon(p1Weapon);
+    if (activePlayers[1]) activePlayers[1].equipWeapon(p2Weapon);
 
     engineState.current = {
       players: activePlayers,
@@ -257,11 +369,15 @@ const GameCanvas = () => {
       },
       enemySpawnTimer: 0,
     };
+
     setScore(0);
     setGameState(GAME_CONFIG.STATES.PLAYING);
   };
 
-  const backToMenu = () => setGameState(GAME_CONFIG.STATES.MENU);
+  const testEquipWeapon = (weaponKey) => {
+    if (engineState.current.players[0])
+      engineState.current.players[0].equipWeapon(weaponKey);
+  };
 
   return (
     <div
@@ -275,7 +391,6 @@ const GameCanvas = () => {
         backgroundColor: "#000",
       }}
     >
-      {/* UI KHI ĐANG CHƠI (SCORE & NÚT PAUSE) */}
       {(gameState === GAME_CONFIG.STATES.PLAYING ||
         gameState === GAME_CONFIG.STATES.PAUSED) && (
         <>
@@ -296,7 +411,6 @@ const GameCanvas = () => {
               ? "BOSS FIGHT!"
               : `${score} / ${GAME_CONFIG.SCORE_TO_BOSS}`}
           </div>
-
           {gameState === GAME_CONFIG.STATES.PLAYING && (
             <button
               onClick={() => setGameState(GAME_CONFIG.STATES.PAUSED)}
@@ -321,6 +435,61 @@ const GameCanvas = () => {
         </>
       )}
 
+      {gameState === GAME_CONFIG.STATES.TEST_WEAPONS && (
+        <div
+          style={{
+            position: "absolute",
+            top: 20,
+            left: 0,
+            width: "100%",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: "10px",
+            flexWrap: "wrap",
+            padding: "0 20px",
+            boxSizing: "border-box",
+            zIndex: 10,
+          }}
+        >
+          <h2 style={{ color: "lime", marginRight: "20px", margin: "5px 0" }}>
+            SHOOTING RANGE
+          </h2>
+          {Object.keys(GAME_CONFIG.WEAPONS).map((wKey) => (
+            <button
+              key={wKey}
+              onClick={() => testEquipWeapon(wKey)}
+              style={{
+                padding: "8px 15px",
+                backgroundColor: "#4CAF50",
+                color: "white",
+                border: "none",
+                borderRadius: "5px",
+                cursor: "pointer",
+                fontWeight: "bold",
+              }}
+            >
+              {GAME_CONFIG.WEAPONS[wKey].name}
+            </button>
+          ))}
+          <button
+            onClick={() => setGameState(GAME_CONFIG.STATES.MENU)}
+            style={{
+              padding: "8px 15px",
+              backgroundColor: "#e74c3c",
+              color: "white",
+              border: "none",
+              borderRadius: "5px",
+              cursor: "pointer",
+              fontWeight: "bold",
+              marginLeft: "20px",
+            }}
+          >
+            EXIT RANGE
+          </button>
+        </div>
+      )}
+
       <canvas
         ref={canvasRef}
         width={screenSize.width}
@@ -328,7 +497,7 @@ const GameCanvas = () => {
         style={{ display: "block" }}
       />
 
-      {/* MÀN HÌNH MENU & CHỌN ĐỘ KHÓ */}
+      {/* MÀN HÌNH MENU CHÍNH */}
       {gameState === GAME_CONFIG.STATES.MENU && (
         <div style={overlayStyle}>
           <h1
@@ -342,7 +511,6 @@ const GameCanvas = () => {
             SPACE SHOOTER
           </h1>
 
-          {/* VÙNG CHỌN ĐỘ KHÓ */}
           <h3 style={{ color: "white", marginBottom: "10px" }}>
             SELECT DIFFICULTY:
           </h3>
@@ -379,18 +547,35 @@ const GameCanvas = () => {
             </button>
           </div>
 
-          <button onClick={() => startGame("SINGLE")} style={buttonStyle}>
+          <button onClick={() => prepareGame("SINGLE")} style={buttonStyle}>
             1 PLAYER
           </button>
-          <button onClick={() => startGame("COOP")} style={buttonStyle}>
+          <button onClick={() => prepareGame("COOP")} style={buttonStyle}>
             2 PLAYERS CO-OP
           </button>
-          <button
-            onClick={() => setGameState(GAME_CONFIG.STATES.INSTRUCTIONS)}
-            style={{ ...buttonStyle, backgroundColor: "#555" }}
-          >
-            HOW TO PLAY
-          </button>
+
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button
+              onClick={() => setGameState(GAME_CONFIG.STATES.INSTRUCTIONS)}
+              style={{
+                ...buttonStyle,
+                width: "150px",
+                backgroundColor: "#555",
+              }}
+            >
+              HOW TO PLAY
+            </button>
+            <button
+              onClick={() => prepareGame("TEST")}
+              style={{
+                ...buttonStyle,
+                width: "150px",
+                backgroundColor: "#8e44ad",
+              }}
+            >
+              TEST WEAPONS
+            </button>
+          </div>
         </div>
       )}
 
@@ -421,13 +606,12 @@ const GameCanvas = () => {
               💀 Reach <b>{GAME_CONFIG.SCORE_TO_BOSS} points</b> to summon the
               Boss.
             </p>
-            <p>⏱️ Change Difficulty to test your reload speed limit.</p>
             <p>
               ⏸ Press <b>ESC</b> anytime to Pause the game.
             </p>
           </div>
           <button
-            onClick={backToMenu}
+            onClick={() => setGameState(GAME_CONFIG.STATES.MENU)}
             style={{
               ...buttonStyle,
               marginTop: "40px",
@@ -439,7 +623,119 @@ const GameCanvas = () => {
         </div>
       )}
 
-      {/* MÀN HÌNH PAUSE */}
+      {/* MÀN HÌNH CHỌN SÚNG NẰM Ở ĐẦU GAME (TRƯỚC KHI CHƠI) */}
+      {gameState === GAME_CONFIG.STATES.WEAPON_SELECT && (
+        <div style={overlayStyle}>
+          <h1 style={{ color: "gold", fontSize: "50px", marginBottom: "30px" }}>
+            CHOOSE YOUR WEAPONS
+          </h1>
+          <h2 style={{ color: "white", marginBottom: "40px" }}>
+            PREPARE FOR BATTLE
+          </h2>
+
+          <div style={{ display: "flex", gap: "50px" }}>
+            <div
+              style={{
+                border: "2px solid #00ff00",
+                padding: "20px",
+                borderRadius: "10px",
+                backgroundColor: "rgba(0,255,0,0.1)",
+              }}
+            >
+              <h3 style={{ color: "#00ff00", textAlign: "center" }}>
+                PLAYER 1
+              </h3>
+              {Object.keys(GAME_CONFIG.WEAPONS).map((w) => (
+                <div key={w}>
+                  <label
+                    style={{
+                      color: "white",
+                      fontSize: "18px",
+                      display: "block",
+                      margin: "10px 0",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="p1Weapon"
+                      value={w}
+                      checked={p1Weapon === w}
+                      onChange={(e) => setP1Weapon(e.target.value)}
+                      style={{ transform: "scale(1.5)", marginRight: "10px" }}
+                    />
+                    {GAME_CONFIG.WEAPONS[w].name}
+                  </label>
+                </div>
+              ))}
+            </div>
+
+            {activeMode === "COOP" && (
+              <div
+                style={{
+                  border: "2px solid #00aaff",
+                  padding: "20px",
+                  borderRadius: "10px",
+                  backgroundColor: "rgba(0,170,255,0.1)",
+                }}
+              >
+                <h3 style={{ color: "#00aaff", textAlign: "center" }}>
+                  PLAYER 2
+                </h3>
+                {Object.keys(GAME_CONFIG.WEAPONS).map((w) => (
+                  <div key={w}>
+                    <label
+                      style={{
+                        color: "white",
+                        fontSize: "18px",
+                        display: "block",
+                        margin: "10px 0",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="p2Weapon"
+                        value={w}
+                        checked={p2Weapon === w}
+                        onChange={(e) => setP2Weapon(e.target.value)}
+                        style={{ transform: "scale(1.5)", marginRight: "10px" }}
+                      />
+                      {GAME_CONFIG.WEAPONS[w].name}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: "flex", gap: "20px", marginTop: "50px" }}>
+            <button
+              onClick={() => setGameState(GAME_CONFIG.STATES.MENU)}
+              style={{
+                ...buttonStyle,
+                backgroundColor: "#555",
+                width: "200px",
+              }}
+            >
+              BACK
+            </button>
+            <button
+              onClick={startGame}
+              style={{
+                ...buttonStyle,
+                backgroundColor: "#4CAF50",
+                width: "300px",
+                fontSize: "24px",
+              }}
+            >
+              START MISSION
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* PAUSE, GAMEOVER, VICTORY CỨ GIỮ NGUYÊN ... */}
       {gameState === GAME_CONFIG.STATES.PAUSED && (
         <div style={overlayStyle}>
           <h1 style={{ color: "yellow", fontSize: "50px" }}>PAUSED</h1>
@@ -450,45 +746,32 @@ const GameCanvas = () => {
             RESUME
           </button>
           <button
-            onClick={backToMenu}
+            onClick={() => setGameState(GAME_CONFIG.STATES.MENU)}
             style={{ ...buttonStyle, backgroundColor: "#e74c3c" }}
           >
-            QUIT TO MENU
+            QUIT
           </button>
         </div>
       )}
-
-      {/* MÀN HÌNH GAME OVER */}
       {gameState === GAME_CONFIG.STATES.GAMEOVER && (
         <div style={overlayStyle}>
           <h1 style={{ color: "red", fontSize: "60px" }}>GAME OVER</h1>
-          <h2 style={{ color: "white", marginBottom: "30px" }}>
-            FINAL SCORE: {score}
-          </h2>
-          <button onClick={() => startGame("SINGLE")} style={buttonStyle}>
-            RETRY (1P)
-          </button>
-          <button onClick={() => startGame("COOP")} style={buttonStyle}>
-            RETRY (2P)
-          </button>
           <button
-            onClick={backToMenu}
+            onClick={() => setGameState(GAME_CONFIG.STATES.MENU)}
             style={{ ...buttonStyle, backgroundColor: "#555" }}
           >
             MENU
           </button>
         </div>
       )}
-
-      {/* MÀN HÌNH CHIẾN THẮNG */}
       {gameState === GAME_CONFIG.STATES.VICTORY && (
         <div style={overlayStyle}>
           <h1 style={{ color: "gold", fontSize: "60px" }}>VICTORY!</h1>
-          <h2 style={{ color: "white", marginBottom: "30px" }}>
-            Galaxy is safe again!
-          </h2>
-          <button onClick={backToMenu} style={buttonStyle}>
-            BACK TO MENU
+          <button
+            onClick={() => setGameState(GAME_CONFIG.STATES.MENU)}
+            style={buttonStyle}
+          >
+            MENU
           </button>
         </div>
       )}
@@ -496,7 +779,6 @@ const GameCanvas = () => {
   );
 };
 
-// Các style UI
 const overlayStyle = {
   position: "absolute",
   top: 0,
