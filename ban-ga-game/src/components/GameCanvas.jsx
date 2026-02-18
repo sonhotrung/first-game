@@ -400,6 +400,7 @@ const GameCanvas = () => {
         touchAction: "none",
       }}
     >
+      {/* UI LÚC CHƠI BÌNH THƯỜNG */}
       {(gameState === GAME_CONFIG.STATES.PLAYING ||
         gameState === GAME_CONFIG.STATES.PAUSED) && (
         <>
@@ -413,6 +414,7 @@ const GameCanvas = () => {
               fontFamily: "monospace",
               fontSize: "24px",
               textShadow: "2px 2px 2px black",
+              pointerEvents: "none",
             }}
           >
             SCORE:{" "}
@@ -423,23 +425,27 @@ const GameCanvas = () => {
           {/* Nút Pause cho PC (Chỉ hiện khi ko có touch) */}
           {gameState === GAME_CONFIG.STATES.PLAYING && !isTouchDevice && (
             <button
-              onClick={() => setGameState(GAME_CONFIG.STATES.PAUSED)}
+              onPointerDown={() => setGameState(GAME_CONFIG.STATES.PAUSED)}
               style={{
                 position: "absolute",
                 top: 20,
                 right: 20,
-                zIndex: 10,
-                padding: "10px 15px",
+                zIndex: 15,
+                padding: isTouchDevice ? "10px 15px" : "10px 15px",
                 backgroundColor: "rgba(255, 255, 255, 0.2)",
                 color: "white",
-                border: "1px solid white",
-                borderRadius: "5px",
+                border: "2px solid white",
+                borderRadius: "8px",
                 cursor: "pointer",
                 fontFamily: "monospace",
-                fontSize: "18px",
+                fontSize: isTouchDevice ? "24px" : "18px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "auto",
               }}
             >
-              ⏸ PAUSE (ESC)
+              {isTouchDevice ? "⏸" : "⏸ PAUSE (ESC)"}
             </button>
           )}
         </>
