@@ -32,6 +32,10 @@ const GameCanvas = () => {
   const [p2Weapon, setP2Weapon] = useState("DEFAULT");
   const [activeMode, setActiveMode] = useState("SINGLE");
 
+  // --- CÁC STATE CHO MOBILE CONTROLS ---
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const [swapControls, setSwapControls] = useState(false);
+
   const engineState = useRef({
     players: [],
     bullets: [],
@@ -46,6 +50,7 @@ const GameCanvas = () => {
   });
 
   useEffect(() => {
+    setIsTouchDevice("ontouchstart" in window || navigator.maxTouchPoints > 0);
     const handleResize = () =>
       setScreenSize({ width: window.innerWidth, height: window.innerHeight });
     window.addEventListener("resize", handleResize);
@@ -95,7 +100,6 @@ const GameCanvas = () => {
     window.addEventListener("keyup", onKeyUp);
 
     const updatePhysics = () => {
-      // 1. CẬP NHẬT PLAYER & BẮN ĐẠN
       engine.players.forEach((p, idx) => {
         if (!p || p.markedForDeletion) return;
         const inputStr = idx === 0 ? "p1" : "p2";
@@ -141,16 +145,13 @@ const GameCanvas = () => {
         return;
       }
 
-      // 2. LOGIC SPAWN QUÁI / BOSS TRỰC TIẾP
       if (!isTestMode) {
         setScore((currentScore) => {
-          // Khi đủ điểm -> Thả Boss thẳng xuống không cần chờ
           if (currentScore >= GAME_CONFIG.SCORE_TO_BOSS && !engine.boss) {
             engine.boss = new Boss(screenSize.width);
             engine.enemies = [];
-            engine.bullets = []; // Quét sạch quái rác
+            engine.bullets = [];
           }
-
           if (!engine.boss) {
             engine.enemySpawnTimer++;
             if (engine.enemySpawnTimer > 60) {
@@ -210,7 +211,6 @@ const GameCanvas = () => {
       engine.bullets.forEach((b) => b.update());
       engine.enemies.forEach((e) => e.update(screenSize.height));
 
-      // 4. VA CHẠM (Xuyên thấu)
       engine.bullets.forEach((bullet) => {
         if (bullet.markedForDeletion) return;
         engine.enemies.forEach((enemy) => {
@@ -299,13 +299,11 @@ const GameCanvas = () => {
     };
   }, [gameState, screenSize]);
 
-  // LUỒNG 1: Bấm Play từ Menu -> Chuyển sang chọn súng
   const prepareGame = (mode) => {
     setActiveMode(mode);
     setP1Weapon("DEFAULT");
     setP2Weapon("DEFAULT");
 
-    // Nếu là TEST, setup sẵn Player và bắn luôn, không cần qua Menu chọn súng
     if (mode === "TEST") {
       const diffConfig = GAME_CONFIG.DIFFICULTY[difficulty];
       const p1 = new Player(
@@ -333,7 +331,6 @@ const GameCanvas = () => {
     }
   };
 
-  // LUỒNG 2: Chốt súng -> Spawn Player -> Vào trận
   const startGame = () => {
     const diffConfig = GAME_CONFIG.DIFFICULTY[difficulty];
     const p1 = new Player(
@@ -350,10 +347,8 @@ const GameCanvas = () => {
       "P2",
       diffConfig,
     );
-
     const activePlayers = activeMode === "SINGLE" ? [p1] : [p1, p2];
 
-    // Nạp súng đã chọn vào Player
     activePlayers[0].equipWeapon(p1Weapon);
     if (activePlayers[1]) activePlayers[1].equipWeapon(p2Weapon);
 
@@ -379,6 +374,13 @@ const GameCanvas = () => {
       engineState.current.players[0].equipWeapon(weaponKey);
   };
 
+  const handleTouch = (player, action, isDown) => (e) => {
+    e.preventDefault();
+    if (engineState.current.inputs[player] !== undefined) {
+      engineState.current.inputs[player][action] = isDown;
+    }
+  };
+
   return (
     <div
       style={{
@@ -389,8 +391,11 @@ const GameCanvas = () => {
         height: "100vh",
         overflow: "hidden",
         backgroundColor: "#000",
+        userSelect: "none",
+        touchAction: "none",
       }}
     >
+      {/* UI LÚC CHƠI BÌNH THƯỜNG */}
       {(gameState === GAME_CONFIG.STATES.PLAYING ||
         gameState === GAME_CONFIG.STATES.PAUSED) && (
         <>
@@ -404,6 +409,7 @@ const GameCanvas = () => {
               fontFamily: "monospace",
               fontSize: "24px",
               textShadow: "2px 2px 2px black",
+              pointerEvents: "none",
             }}
           >
             SCORE:{" "}
@@ -411,29 +417,258 @@ const GameCanvas = () => {
               ? "BOSS FIGHT!"
               : `${score} / ${GAME_CONFIG.SCORE_TO_BOSS}`}
           </div>
+
+          {/* NÚT PAUSE ĐÃ ĐƯỢC CHUYỂN LÊN GÓC PHẢI TRÊN */}
           {gameState === GAME_CONFIG.STATES.PLAYING && (
             <button
-              onClick={() => setGameState(GAME_CONFIG.STATES.PAUSED)}
+              onPointerDown={() => setGameState(GAME_CONFIG.STATES.PAUSED)}
               style={{
                 position: "absolute",
                 top: 20,
                 right: 20,
-                zIndex: 10,
-                padding: "10px 15px",
+                zIndex: 15,
+                padding: isTouchDevice ? "10px 15px" : "10px 15px",
                 backgroundColor: "rgba(255, 255, 255, 0.2)",
                 color: "white",
-                border: "1px solid white",
-                borderRadius: "5px",
+                border: "2px solid white",
+                borderRadius: "8px",
                 cursor: "pointer",
                 fontFamily: "monospace",
-                fontSize: "18px",
+                fontSize: isTouchDevice ? "24px" : "18px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "auto",
               }}
             >
-              ⏸ PAUSE (ESC)
+              {isTouchDevice ? "⏸" : "⏸ PAUSE (ESC)"}
             </button>
           )}
         </>
       )}
+
+      {/* --- MOBILE: JOYPAD CẢM ỨNG TRÊN MÀN HÌNH --- */}
+      {isTouchDevice && gameState === GAME_CONFIG.STATES.PLAYING && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: "30px",
+            left: 0,
+            width: "100%",
+            display: "flex",
+            justifyContent: "space-between",
+            padding: "0 20px",
+            boxSizing: "border-box",
+            zIndex: 15,
+            pointerEvents: "none",
+          }}
+        >
+          {activeMode === "SINGLE" ? (
+            <>
+              {/* CHƠI ĐƠN: Group Bắn/Nạp (Mặc định bên Trái) */}
+              <div
+                style={{
+                  pointerEvents: "auto",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "15px",
+                  order: swapControls ? 2 : 1,
+                }}
+              >
+                <button
+                  onPointerDown={handleTouch("p1", "shoot", true)}
+                  onPointerUp={handleTouch("p1", "shoot", false)}
+                  onPointerLeave={handleTouch("p1", "shoot", false)}
+                  style={touchBtnStyle}
+                >
+                  🔫
+                </button>
+                <button
+                  onPointerDown={handleTouch("p1", "reload", true)}
+                  onPointerUp={handleTouch("p1", "reload", false)}
+                  onPointerLeave={handleTouch("p1", "reload", false)}
+                  style={touchBtnStyle}
+                >
+                  🔄
+                </button>
+              </div>
+
+              {/* CHƠI ĐƠN: Group Di Chuyển (Mặc định bên Phải) */}
+              <div
+                style={{
+                  pointerEvents: "auto",
+                  display: "flex",
+                  gap: "15px",
+                  alignItems: "flex-end",
+                  order: swapControls ? 1 : 2,
+                }}
+              >
+                <button
+                  onPointerDown={handleTouch("p1", "left", true)}
+                  onPointerUp={handleTouch("p1", "left", false)}
+                  onPointerLeave={handleTouch("p1", "left", false)}
+                  style={touchBtnStyle}
+                >
+                  ⬅️
+                </button>
+                <button
+                  onPointerDown={handleTouch("p1", "right", true)}
+                  onPointerUp={handleTouch("p1", "right", false)}
+                  onPointerLeave={handleTouch("p1", "right", false)}
+                  style={touchBtnStyle}
+                >
+                  ➡️
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* CO-OP: Nửa trái cho P1 (Xanh lá) */}
+              <div
+                style={{
+                  pointerEvents: "auto",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "10px",
+                }}
+              >
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button
+                    onPointerDown={handleTouch("p1", "left", true)}
+                    onPointerUp={handleTouch("p1", "left", false)}
+                    onPointerLeave={handleTouch("p1", "left", false)}
+                    style={{
+                      ...touchBtnStyle,
+                      borderColor: "#00ff00",
+                      width: "50px",
+                      height: "50px",
+                    }}
+                  >
+                    ⬅️
+                  </button>
+                  <button
+                    onPointerDown={handleTouch("p1", "right", true)}
+                    onPointerUp={handleTouch("p1", "right", false)}
+                    onPointerLeave={handleTouch("p1", "right", false)}
+                    style={{
+                      ...touchBtnStyle,
+                      borderColor: "#00ff00",
+                      width: "50px",
+                      height: "50px",
+                    }}
+                  >
+                    ➡️
+                  </button>
+                </div>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button
+                    onPointerDown={handleTouch("p1", "shoot", true)}
+                    onPointerUp={handleTouch("p1", "shoot", false)}
+                    onPointerLeave={handleTouch("p1", "shoot", false)}
+                    style={{
+                      ...touchBtnStyle,
+                      borderColor: "#00ff00",
+                      width: "50px",
+                      height: "50px",
+                    }}
+                  >
+                    🔫
+                  </button>
+                  <button
+                    onPointerDown={handleTouch("p1", "reload", true)}
+                    onPointerUp={handleTouch("p1", "reload", false)}
+                    onPointerLeave={handleTouch("p1", "reload", false)}
+                    style={{
+                      ...touchBtnStyle,
+                      borderColor: "#00ff00",
+                      width: "50px",
+                      height: "50px",
+                    }}
+                  >
+                    🔄
+                  </button>
+                </div>
+              </div>
+
+              {/* CO-OP: Nửa phải cho P2 (Xanh biển) */}
+              <div
+                style={{
+                  pointerEvents: "auto",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "10px",
+                  alignItems: "flex-end",
+                }}
+              >
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button
+                    onPointerDown={handleTouch("p2", "left", true)}
+                    onPointerUp={handleTouch("p2", "left", false)}
+                    onPointerLeave={handleTouch("p2", "left", false)}
+                    style={{
+                      ...touchBtnStyle,
+                      borderColor: "#00aaff",
+                      width: "50px",
+                      height: "50px",
+                    }}
+                  >
+                    ⬅️
+                  </button>
+                  <button
+                    onPointerDown={handleTouch("p2", "right", true)}
+                    onPointerUp={handleTouch("p2", "right", false)}
+                    onPointerLeave={handleTouch("p2", "right", false)}
+                    style={{
+                      ...touchBtnStyle,
+                      borderColor: "#00aaff",
+                      width: "50px",
+                      height: "50px",
+                    }}
+                  >
+                    ➡️
+                  </button>
+                </div>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button
+                    onPointerDown={handleTouch("p2", "shoot", true)}
+                    onPointerUp={handleTouch("p2", "shoot", false)}
+                    onPointerLeave={handleTouch("p2", "shoot", false)}
+                    style={{
+                      ...touchBtnStyle,
+                      borderColor: "#00aaff",
+                      width: "50px",
+                      height: "50px",
+                    }}
+                  >
+                    🔫
+                  </button>
+                  <button
+                    onPointerDown={handleTouch("p2", "reload", true)}
+                    onPointerUp={handleTouch("p2", "reload", false)}
+                    onPointerLeave={handleTouch("p2", "reload", false)}
+                    style={{
+                      ...touchBtnStyle,
+                      borderColor: "#00aaff",
+                      width: "50px",
+                      height: "50px",
+                    }}
+                  >
+                    🔄
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* CÁC GIAO DIỆN KHÁC */}
+      <canvas
+        ref={canvasRef}
+        width={screenSize.width}
+        height={screenSize.height}
+        style={{ display: "block" }}
+      />
 
       {gameState === GAME_CONFIG.STATES.TEST_WEAPONS && (
         <div
@@ -485,36 +720,35 @@ const GameCanvas = () => {
               marginLeft: "20px",
             }}
           >
-            EXIT RANGE
+            EXIT
           </button>
         </div>
       )}
 
-      <canvas
-        ref={canvasRef}
-        width={screenSize.width}
-        height={screenSize.height}
-        style={{ display: "block" }}
-      />
-
-      {/* MÀN HÌNH MENU CHÍNH */}
       {gameState === GAME_CONFIG.STATES.MENU && (
         <div style={overlayStyle}>
           <h1
             style={{
               color: "white",
-              fontSize: "60px",
+              fontSize: "40px",
               marginBottom: "20px",
               textShadow: "0 0 10px #00ff00",
+              textAlign: "center",
             }}
           >
             SPACE SHOOTER
           </h1>
 
-          <h3 style={{ color: "white", marginBottom: "10px" }}>
-            SELECT DIFFICULTY:
-          </h3>
-          <div style={{ display: "flex", gap: "15px", marginBottom: "30px" }}>
+          <h3 style={{ color: "white", marginBottom: "10px" }}>DIFFICULTY:</h3>
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              marginBottom: "30px",
+              flexWrap: "wrap",
+              justifyContent: "center",
+            }}
+          >
             <button
               onClick={() => setDifficulty("EASY")}
               style={{
@@ -554,7 +788,15 @@ const GameCanvas = () => {
             2 PLAYERS CO-OP
           </button>
 
-          <div style={{ display: "flex", gap: "10px" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              flexWrap: "wrap",
+              justifyContent: "center",
+              marginTop: "10px",
+            }}
+          >
             <button
               onClick={() => setGameState(GAME_CONFIG.STATES.INSTRUCTIONS)}
               style={{
@@ -579,70 +821,86 @@ const GameCanvas = () => {
         </div>
       )}
 
-      {/* MÀN HÌNH HƯỚNG DẪN */}
       {gameState === GAME_CONFIG.STATES.INSTRUCTIONS && (
         <div style={overlayStyle}>
-          <h1 style={{ color: "yellow", fontSize: "40px" }}>INSTRUCTIONS</h1>
+          <h1 style={{ color: "yellow", fontSize: "30px" }}>INSTRUCTIONS</h1>
           <div
             style={{
               color: "white",
-              fontSize: "20px",
+              fontSize: "16px",
               lineHeight: "1.8",
               textAlign: "left",
               backgroundColor: "rgba(0,0,0,0.5)",
-              padding: "30px",
+              padding: "20px",
               borderRadius: "10px",
+              maxWidth: "90%",
             }}
           >
             <p>
-              <b>Player 1 (Green):</b> Move: [⬅️ ➡️] | Shoot: [⬆️] | Reload:
-              [⬇️]
+              <b>PC Player 1:</b> [⬅️ ➡️] | Shoot: [⬆️] | Reload: [⬇️]
             </p>
             <p>
-              <b>Player 2 (Blue):</b> Move: [A D] | Shoot: [W] | Reload: [S]
+              <b>PC Player 2:</b> [A D] | Shoot: [W] | Reload: [S]
+            </p>
+            <p>
+              <b>Mobile:</b> Use On-screen touch buttons.
             </p>
             <hr style={{ borderColor: "#555" }} />
             <p>
               💀 Reach <b>{GAME_CONFIG.SCORE_TO_BOSS} points</b> to summon the
               Boss.
             </p>
-            <p>
-              ⏸ Press <b>ESC</b> anytime to Pause the game.
-            </p>
           </div>
           <button
             onClick={() => setGameState(GAME_CONFIG.STATES.MENU)}
             style={{
               ...buttonStyle,
-              marginTop: "40px",
+              marginTop: "20px",
               backgroundColor: "#e74c3c",
             }}
           >
-            BACK TO MENU
+            BACK
           </button>
         </div>
       )}
 
-      {/* MÀN HÌNH CHỌN SÚNG NẰM Ở ĐẦU GAME (TRƯỚC KHI CHƠI) */}
       {gameState === GAME_CONFIG.STATES.WEAPON_SELECT && (
         <div style={overlayStyle}>
-          <h1 style={{ color: "gold", fontSize: "50px", marginBottom: "30px" }}>
-            CHOOSE YOUR WEAPONS
+          <h1
+            style={{
+              color: "gold",
+              fontSize: "30px",
+              marginBottom: "20px",
+              textAlign: "center",
+            }}
+          >
+            CHOOSE WEAPONS
           </h1>
-          <h2 style={{ color: "white", marginBottom: "40px" }}>
-            PREPARE FOR BATTLE
-          </h2>
 
-          <div style={{ display: "flex", gap: "50px" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "20px",
+              flexWrap: "wrap",
+              justifyContent: "center",
+            }}
+          >
             <div
               style={{
                 border: "2px solid #00ff00",
-                padding: "20px",
+                padding: "15px",
                 borderRadius: "10px",
                 backgroundColor: "rgba(0,255,0,0.1)",
+                minWidth: "150px",
               }}
             >
-              <h3 style={{ color: "#00ff00", textAlign: "center" }}>
+              <h3
+                style={{
+                  color: "#00ff00",
+                  textAlign: "center",
+                  margin: "0 0 10px 0",
+                }}
+              >
                 PLAYER 1
               </h3>
               {Object.keys(GAME_CONFIG.WEAPONS).map((w) => (
@@ -650,9 +908,9 @@ const GameCanvas = () => {
                   <label
                     style={{
                       color: "white",
-                      fontSize: "18px",
+                      fontSize: "14px",
                       display: "block",
-                      margin: "10px 0",
+                      margin: "8px 0",
                       cursor: "pointer",
                     }}
                   >
@@ -662,7 +920,7 @@ const GameCanvas = () => {
                       value={w}
                       checked={p1Weapon === w}
                       onChange={(e) => setP1Weapon(e.target.value)}
-                      style={{ transform: "scale(1.5)", marginRight: "10px" }}
+                      style={{ transform: "scale(1.2)", marginRight: "10px" }}
                     />
                     {GAME_CONFIG.WEAPONS[w].name}
                   </label>
@@ -674,12 +932,19 @@ const GameCanvas = () => {
               <div
                 style={{
                   border: "2px solid #00aaff",
-                  padding: "20px",
+                  padding: "15px",
                   borderRadius: "10px",
                   backgroundColor: "rgba(0,170,255,0.1)",
+                  minWidth: "150px",
                 }}
               >
-                <h3 style={{ color: "#00aaff", textAlign: "center" }}>
+                <h3
+                  style={{
+                    color: "#00aaff",
+                    textAlign: "center",
+                    margin: "0 0 10px 0",
+                  }}
+                >
                   PLAYER 2
                 </h3>
                 {Object.keys(GAME_CONFIG.WEAPONS).map((w) => (
@@ -687,9 +952,9 @@ const GameCanvas = () => {
                     <label
                       style={{
                         color: "white",
-                        fontSize: "18px",
+                        fontSize: "14px",
                         display: "block",
-                        margin: "10px 0",
+                        margin: "8px 0",
                         cursor: "pointer",
                       }}
                     >
@@ -699,7 +964,7 @@ const GameCanvas = () => {
                         value={w}
                         checked={p2Weapon === w}
                         onChange={(e) => setP2Weapon(e.target.value)}
-                        style={{ transform: "scale(1.5)", marginRight: "10px" }}
+                        style={{ transform: "scale(1.2)", marginRight: "10px" }}
                       />
                       {GAME_CONFIG.WEAPONS[w].name}
                     </label>
@@ -709,13 +974,21 @@ const GameCanvas = () => {
             )}
           </div>
 
-          <div style={{ display: "flex", gap: "20px", marginTop: "50px" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              marginTop: "30px",
+              flexWrap: "wrap",
+              justifyContent: "center",
+            }}
+          >
             <button
               onClick={() => setGameState(GAME_CONFIG.STATES.MENU)}
               style={{
                 ...buttonStyle,
                 backgroundColor: "#555",
-                width: "200px",
+                width: "120px",
               }}
             >
               BACK
@@ -725,8 +998,7 @@ const GameCanvas = () => {
               style={{
                 ...buttonStyle,
                 backgroundColor: "#4CAF50",
-                width: "300px",
-                fontSize: "24px",
+                width: "200px",
               }}
             >
               START MISSION
@@ -735,16 +1007,36 @@ const GameCanvas = () => {
         </div>
       )}
 
-      {/* PAUSE, GAMEOVER, VICTORY CỨ GIỮ NGUYÊN ... */}
+      {/* MÀN HÌNH PAUSE: CÓ THÊM NÚT ĐỔI BÊN TAY CẦM CHO MOBILE */}
       {gameState === GAME_CONFIG.STATES.PAUSED && (
         <div style={overlayStyle}>
-          <h1 style={{ color: "yellow", fontSize: "50px" }}>PAUSED</h1>
+          <h1
+            style={{ color: "yellow", fontSize: "50px", marginBottom: "20px" }}
+          >
+            PAUSED
+          </h1>
           <button
             onClick={() => setGameState(GAME_CONFIG.STATES.PLAYING)}
-            style={buttonStyle}
+            style={{ ...buttonStyle, marginBottom: "20px" }}
           >
             RESUME
           </button>
+
+          {/* Nút SWAP CONTROLS chỉ hiện trên điện thoại ở chế độ 1 Người */}
+          {isTouchDevice && activeMode === "SINGLE" && (
+            <button
+              onClick={() => setSwapControls(!swapControls)}
+              style={{
+                ...buttonStyle,
+                backgroundColor: "#3498db",
+                fontSize: "14px",
+                marginBottom: "20px",
+              }}
+            >
+              {swapControls ? "🔄 L: MOVE | R: SHOOT" : "🔄 L: SHOOT | R: MOVE"}
+            </button>
+          )}
+
           <button
             onClick={() => setGameState(GAME_CONFIG.STATES.MENU)}
             style={{ ...buttonStyle, backgroundColor: "#e74c3c" }}
@@ -753,9 +1045,10 @@ const GameCanvas = () => {
           </button>
         </div>
       )}
+
       {gameState === GAME_CONFIG.STATES.GAMEOVER && (
         <div style={overlayStyle}>
-          <h1 style={{ color: "red", fontSize: "60px" }}>GAME OVER</h1>
+          <h1 style={{ color: "red", fontSize: "50px" }}>GAME OVER</h1>
           <button
             onClick={() => setGameState(GAME_CONFIG.STATES.MENU)}
             style={{ ...buttonStyle, backgroundColor: "#555" }}
@@ -766,7 +1059,7 @@ const GameCanvas = () => {
       )}
       {gameState === GAME_CONFIG.STATES.VICTORY && (
         <div style={overlayStyle}>
-          <h1 style={{ color: "gold", fontSize: "60px" }}>VICTORY!</h1>
+          <h1 style={{ color: "gold", fontSize: "50px" }}>VICTORY!</h1>
           <button
             onClick={() => setGameState(GAME_CONFIG.STATES.MENU)}
             style={buttonStyle}
@@ -779,18 +1072,22 @@ const GameCanvas = () => {
   );
 };
 
+// CÁC STYLE CSS MẶC ĐỊNH
 const overlayStyle = {
   position: "absolute",
   top: 0,
   left: 0,
   width: "100%",
   height: "100%",
-  backgroundColor: "rgba(0,0,10,0.9)",
+  backgroundColor: "rgba(0,0,10,0.95)",
   display: "flex",
   flexDirection: "column",
   justifyContent: "center",
   alignItems: "center",
   zIndex: 20,
+  overflowY: "auto",
+  padding: "20px",
+  boxSizing: "border-box",
 };
 const buttonStyle = {
   width: "250px",
@@ -802,16 +1099,33 @@ const buttonStyle = {
   color: "white",
   border: "none",
   borderRadius: "8px",
-  margin: "10px",
+  margin: "5px",
+  touchAction: "manipulation",
 };
 const diffBtnStyle = {
-  padding: "10px 20px",
+  padding: "10px 15px",
   cursor: "pointer",
   fontWeight: "bold",
   borderRadius: "5px",
   color: "white",
   borderStyle: "solid",
   borderWidth: "2px",
+  touchAction: "manipulation",
+};
+
+// STYLE RIÊNG CHO CÁC NÚT BẤM TRÊN MÀN HÌNH CẢM ỨNG
+const touchBtnStyle = {
+  width: "65px",
+  height: "65px",
+  borderRadius: "50%",
+  backgroundColor: "rgba(255, 255, 255, 0.2)",
+  border: "2px solid rgba(255,255,255,0.5)",
+  color: "white",
+  fontSize: "24px",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  userSelect: "none",
 };
 
 export default GameCanvas;
