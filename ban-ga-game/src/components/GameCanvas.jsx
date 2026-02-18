@@ -34,7 +34,7 @@ const GameCanvas = () => {
 
   // --- CÁC STATE CHO MOBILE CONTROLS ---
   const [isTouchDevice, setIsTouchDevice] = useState(false);
-  const [swapControls, setSwapControls] = useState(false);
+  const [swapControls, setSwapControls] = useState(false); // false: Bắn Trái/Di chuyển Phải | true: Ngược lại
 
   const engineState = useRef({
     players: [],
@@ -50,7 +50,9 @@ const GameCanvas = () => {
   });
 
   useEffect(() => {
+    // Nhận diện thiết bị cảm ứng
     setIsTouchDevice("ontouchstart" in window || navigator.maxTouchPoints > 0);
+
     const handleResize = () =>
       setScreenSize({ width: window.innerWidth, height: window.innerHeight });
     window.addEventListener("resize", handleResize);
@@ -70,6 +72,7 @@ const GameCanvas = () => {
     const engine = engineState.current;
     const isTestMode = gameState === GAME_CONFIG.STATES.TEST_WEAPONS;
 
+    // Lắng nghe Bàn phím máy tính
     const handleKeyEvent = (e, isKeyDown) => {
       if (e.code === GAME_CONFIG.KEYS.PAUSE && isKeyDown) {
         setGameState(GAME_CONFIG.STATES.PAUSED);
@@ -99,6 +102,7 @@ const GameCanvas = () => {
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
 
+    // VÒNG LẶP GAME VẬT LÝ (Giữ nguyên như cũ)
     const updatePhysics = () => {
       engine.players.forEach((p, idx) => {
         if (!p || p.markedForDeletion) return;
@@ -374,8 +378,9 @@ const GameCanvas = () => {
       engineState.current.players[0].equipWeapon(weaponKey);
   };
 
+  // Hàm xử lý tương tác Cảm ứng (Touch) bơm thẳng vào engine
   const handleTouch = (player, action, isDown) => (e) => {
-    e.preventDefault();
+    e.preventDefault(); // Ngăn zoom/scroll web
     if (engineState.current.inputs[player] !== undefined) {
       engineState.current.inputs[player][action] = isDown;
     }
@@ -417,9 +422,8 @@ const GameCanvas = () => {
               ? "BOSS FIGHT!"
               : `${score} / ${GAME_CONFIG.SCORE_TO_BOSS}`}
           </div>
-
-          {/* NÚT PAUSE ĐÃ ĐƯỢC CHUYỂN LÊN GÓC PHẢI TRÊN */}
-          {gameState === GAME_CONFIG.STATES.PLAYING && (
+          {/* Nút Pause cho PC (Chỉ hiện khi ko có touch) */}
+          {gameState === GAME_CONFIG.STATES.PLAYING && !isTouchDevice && (
             <button
               onPointerDown={() => setGameState(GAME_CONFIG.STATES.PAUSED)}
               style={{
@@ -463,6 +467,34 @@ const GameCanvas = () => {
             pointerEvents: "none",
           }}
         >
+          {/* Nút VUÔNG PAUSE Ở GIỮA */}
+          <div
+            style={{
+              position: "absolute",
+              top: "-100px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              pointerEvents: "auto",
+            }}
+          >
+            <button
+              onPointerDown={() => setGameState(GAME_CONFIG.STATES.PAUSED)}
+              style={{
+                width: "50px",
+                height: "50px",
+                backgroundColor: "rgba(255,255,255,0.2)",
+                color: "white",
+                border: "2px solid white",
+                fontSize: "20px",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              ⏸
+            </button>
+          </div>
+
           {activeMode === "SINGLE" ? (
             <>
               {/* CHƠI ĐƠN: Group Bắn/Nạp (Mặc định bên Trái) */}
@@ -1117,7 +1149,7 @@ const diffBtnStyle = {
 const touchBtnStyle = {
   width: "65px",
   height: "65px",
-  borderRadius: "50%",
+  borderRadius: "50%", // Làm tròn thành hình tròn hoàn hảo
   backgroundColor: "rgba(255, 255, 255, 0.2)",
   border: "2px solid rgba(255,255,255,0.5)",
   color: "white",
@@ -1125,7 +1157,7 @@ const touchBtnStyle = {
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
-  userSelect: "none",
+  userSelect: "none", // Chống highlight đen màn hình khi bấm nhanh
 };
 
 export default GameCanvas;
