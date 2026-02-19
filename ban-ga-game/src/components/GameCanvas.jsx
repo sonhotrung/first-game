@@ -418,7 +418,6 @@ const GameCanvas = () => {
               : `${score} / ${GAME_CONFIG.SCORE_TO_BOSS}`}
           </div>
 
-          {/* NÚT PAUSE ĐÃ ĐƯỢC CHUYỂN LÊN GÓC PHẢI TRÊN */}
           {gameState === GAME_CONFIG.STATES.PLAYING && (
             <button
               onPointerDown={() => setGameState(GAME_CONFIG.STATES.PAUSED)}
@@ -447,130 +446,41 @@ const GameCanvas = () => {
         </>
       )}
 
-      {/* --- MOBILE: JOYPAD CẢM ỨNG TRÊN MÀN HÌNH --- */}
-      {isTouchDevice && gameState === GAME_CONFIG.STATES.PLAYING && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: "30px",
-            left: 0,
-            width: "100%",
-            display: "flex",
-            justifyContent: "space-between",
-            padding: "0 20px",
-            boxSizing: "border-box",
-            zIndex: 15,
-            pointerEvents: "none",
-          }}
-        >
-          {activeMode === "SINGLE" ? (
-            <>
-              {/* CHƠI ĐƠN: Group Bắn/Nạp (Mặc định bên Trái) */}
-              <div
-                style={{
-                  pointerEvents: "auto",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "15px",
-                  order: swapControls ? 2 : 1,
-                }}
-              >
-                <button
-                  onPointerDown={handleTouch("p1", "shoot", true)}
-                  onPointerUp={handleTouch("p1", "shoot", false)}
-                  onPointerLeave={handleTouch("p1", "shoot", false)}
-                  style={touchBtnStyle}
+      {/* --- MOBILE: JOYPAD CẢM ỨNG TRÊN MÀN HÌNH (ÁP DỤNG CHO CẢ PLAYING VÀ TEST_WEAPONS) --- */}
+      {isTouchDevice &&
+        (gameState === GAME_CONFIG.STATES.PLAYING ||
+          gameState === GAME_CONFIG.STATES.TEST_WEAPONS) && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: "30px",
+              left: 0,
+              width: "100%",
+              display: "flex",
+              justifyContent: "space-between",
+              padding: "0 20px",
+              boxSizing: "border-box",
+              zIndex: 15,
+              pointerEvents: "none",
+            }}
+          >
+            {activeMode === "SINGLE" || activeMode === "TEST" ? (
+              <>
+                {/* CHƠI ĐƠN/TEST: Group Bắn/Nạp (Mặc định bên Trái) */}
+                <div
+                  style={{
+                    pointerEvents: "auto",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "15px",
+                    order: swapControls ? 2 : 1,
+                  }}
                 >
-                  🔫
-                </button>
-                <button
-                  onPointerDown={handleTouch("p1", "reload", true)}
-                  onPointerUp={handleTouch("p1", "reload", false)}
-                  onPointerLeave={handleTouch("p1", "reload", false)}
-                  style={touchBtnStyle}
-                >
-                  🔄
-                </button>
-              </div>
-
-              {/* CHƠI ĐƠN: Group Di Chuyển (Mặc định bên Phải) */}
-              <div
-                style={{
-                  pointerEvents: "auto",
-                  display: "flex",
-                  gap: "15px",
-                  alignItems: "flex-end",
-                  order: swapControls ? 1 : 2,
-                }}
-              >
-                <button
-                  onPointerDown={handleTouch("p1", "left", true)}
-                  onPointerUp={handleTouch("p1", "left", false)}
-                  onPointerLeave={handleTouch("p1", "left", false)}
-                  style={touchBtnStyle}
-                >
-                  ⬅️
-                </button>
-                <button
-                  onPointerDown={handleTouch("p1", "right", true)}
-                  onPointerUp={handleTouch("p1", "right", false)}
-                  onPointerLeave={handleTouch("p1", "right", false)}
-                  style={touchBtnStyle}
-                >
-                  ➡️
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              {/* CO-OP: Nửa trái cho P1 (Xanh lá) */}
-              <div
-                style={{
-                  pointerEvents: "auto",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "10px",
-                }}
-              >
-                <div style={{ display: "flex", gap: "10px" }}>
-                  <button
-                    onPointerDown={handleTouch("p1", "left", true)}
-                    onPointerUp={handleTouch("p1", "left", false)}
-                    onPointerLeave={handleTouch("p1", "left", false)}
-                    style={{
-                      ...touchBtnStyle,
-                      borderColor: "#00ff00",
-                      width: "50px",
-                      height: "50px",
-                    }}
-                  >
-                    ⬅️
-                  </button>
-                  <button
-                    onPointerDown={handleTouch("p1", "right", true)}
-                    onPointerUp={handleTouch("p1", "right", false)}
-                    onPointerLeave={handleTouch("p1", "right", false)}
-                    style={{
-                      ...touchBtnStyle,
-                      borderColor: "#00ff00",
-                      width: "50px",
-                      height: "50px",
-                    }}
-                  >
-                    ➡️
-                  </button>
-                </div>
-                <div style={{ display: "flex", gap: "10px" }}>
                   <button
                     onPointerDown={handleTouch("p1", "shoot", true)}
                     onPointerUp={handleTouch("p1", "shoot", false)}
                     onPointerLeave={handleTouch("p1", "shoot", false)}
-                    style={{
-                      ...touchBtnStyle,
-                      borderColor: "#00ff00",
-                      width: "50px",
-                      height: "50px",
-                    }}
+                    style={touchBtnStyle}
                   >
                     🔫
                   </button>
@@ -578,89 +488,180 @@ const GameCanvas = () => {
                     onPointerDown={handleTouch("p1", "reload", true)}
                     onPointerUp={handleTouch("p1", "reload", false)}
                     onPointerLeave={handleTouch("p1", "reload", false)}
-                    style={{
-                      ...touchBtnStyle,
-                      borderColor: "#00ff00",
-                      width: "50px",
-                      height: "50px",
-                    }}
+                    style={touchBtnStyle}
                   >
                     🔄
                   </button>
                 </div>
-              </div>
 
-              {/* CO-OP: Nửa phải cho P2 (Xanh biển) */}
-              <div
-                style={{
-                  pointerEvents: "auto",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "10px",
-                  alignItems: "flex-end",
-                }}
-              >
-                <div style={{ display: "flex", gap: "10px" }}>
+                {/* CHƠI ĐƠN/TEST: Group Di Chuyển (Mặc định bên Phải) */}
+                <div
+                  style={{
+                    pointerEvents: "auto",
+                    display: "flex",
+                    gap: "15px",
+                    alignItems: "flex-end",
+                    order: swapControls ? 1 : 2,
+                  }}
+                >
                   <button
-                    onPointerDown={handleTouch("p2", "left", true)}
-                    onPointerUp={handleTouch("p2", "left", false)}
-                    onPointerLeave={handleTouch("p2", "left", false)}
-                    style={{
-                      ...touchBtnStyle,
-                      borderColor: "#00aaff",
-                      width: "50px",
-                      height: "50px",
-                    }}
+                    onPointerDown={handleTouch("p1", "left", true)}
+                    onPointerUp={handleTouch("p1", "left", false)}
+                    onPointerLeave={handleTouch("p1", "left", false)}
+                    style={touchBtnStyle}
                   >
                     ⬅️
                   </button>
                   <button
-                    onPointerDown={handleTouch("p2", "right", true)}
-                    onPointerUp={handleTouch("p2", "right", false)}
-                    onPointerLeave={handleTouch("p2", "right", false)}
-                    style={{
-                      ...touchBtnStyle,
-                      borderColor: "#00aaff",
-                      width: "50px",
-                      height: "50px",
-                    }}
+                    onPointerDown={handleTouch("p1", "right", true)}
+                    onPointerUp={handleTouch("p1", "right", false)}
+                    onPointerLeave={handleTouch("p1", "right", false)}
+                    style={touchBtnStyle}
                   >
                     ➡️
                   </button>
                 </div>
-                <div style={{ display: "flex", gap: "10px" }}>
-                  <button
-                    onPointerDown={handleTouch("p2", "shoot", true)}
-                    onPointerUp={handleTouch("p2", "shoot", false)}
-                    onPointerLeave={handleTouch("p2", "shoot", false)}
-                    style={{
-                      ...touchBtnStyle,
-                      borderColor: "#00aaff",
-                      width: "50px",
-                      height: "50px",
-                    }}
-                  >
-                    🔫
-                  </button>
-                  <button
-                    onPointerDown={handleTouch("p2", "reload", true)}
-                    onPointerUp={handleTouch("p2", "reload", false)}
-                    onPointerLeave={handleTouch("p2", "reload", false)}
-                    style={{
-                      ...touchBtnStyle,
-                      borderColor: "#00aaff",
-                      width: "50px",
-                      height: "50px",
-                    }}
-                  >
-                    🔄
-                  </button>
+              </>
+            ) : (
+              <>
+                {/* CO-OP: Nửa trái cho P1 (Xanh lá) */}
+                <div
+                  style={{
+                    pointerEvents: "auto",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                  }}
+                >
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button
+                      onPointerDown={handleTouch("p1", "left", true)}
+                      onPointerUp={handleTouch("p1", "left", false)}
+                      onPointerLeave={handleTouch("p1", "left", false)}
+                      style={{
+                        ...touchBtnStyle,
+                        borderColor: "#00ff00",
+                        width: "50px",
+                        height: "50px",
+                      }}
+                    >
+                      ⬅️
+                    </button>
+                    <button
+                      onPointerDown={handleTouch("p1", "right", true)}
+                      onPointerUp={handleTouch("p1", "right", false)}
+                      onPointerLeave={handleTouch("p1", "right", false)}
+                      style={{
+                        ...touchBtnStyle,
+                        borderColor: "#00ff00",
+                        width: "50px",
+                        height: "50px",
+                      }}
+                    >
+                      ➡️
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button
+                      onPointerDown={handleTouch("p1", "shoot", true)}
+                      onPointerUp={handleTouch("p1", "shoot", false)}
+                      onPointerLeave={handleTouch("p1", "shoot", false)}
+                      style={{
+                        ...touchBtnStyle,
+                        borderColor: "#00ff00",
+                        width: "50px",
+                        height: "50px",
+                      }}
+                    >
+                      🔫
+                    </button>
+                    <button
+                      onPointerDown={handleTouch("p1", "reload", true)}
+                      onPointerUp={handleTouch("p1", "reload", false)}
+                      onPointerLeave={handleTouch("p1", "reload", false)}
+                      style={{
+                        ...touchBtnStyle,
+                        borderColor: "#00ff00",
+                        width: "50px",
+                        height: "50px",
+                      }}
+                    >
+                      🔄
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </>
-          )}
-        </div>
-      )}
+
+                {/* CO-OP: Nửa phải cho P2 (Xanh biển) */}
+                <div
+                  style={{
+                    pointerEvents: "auto",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                    alignItems: "flex-end",
+                  }}
+                >
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button
+                      onPointerDown={handleTouch("p2", "left", true)}
+                      onPointerUp={handleTouch("p2", "left", false)}
+                      onPointerLeave={handleTouch("p2", "left", false)}
+                      style={{
+                        ...touchBtnStyle,
+                        borderColor: "#00aaff",
+                        width: "50px",
+                        height: "50px",
+                      }}
+                    >
+                      ⬅️
+                    </button>
+                    <button
+                      onPointerDown={handleTouch("p2", "right", true)}
+                      onPointerUp={handleTouch("p2", "right", false)}
+                      onPointerLeave={handleTouch("p2", "right", false)}
+                      style={{
+                        ...touchBtnStyle,
+                        borderColor: "#00aaff",
+                        width: "50px",
+                        height: "50px",
+                      }}
+                    >
+                      ➡️
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button
+                      onPointerDown={handleTouch("p2", "shoot", true)}
+                      onPointerUp={handleTouch("p2", "shoot", false)}
+                      onPointerLeave={handleTouch("p2", "shoot", false)}
+                      style={{
+                        ...touchBtnStyle,
+                        borderColor: "#00aaff",
+                        width: "50px",
+                        height: "50px",
+                      }}
+                    >
+                      🔫
+                    </button>
+                    <button
+                      onPointerDown={handleTouch("p2", "reload", true)}
+                      onPointerUp={handleTouch("p2", "reload", false)}
+                      onPointerLeave={handleTouch("p2", "reload", false)}
+                      style={{
+                        ...touchBtnStyle,
+                        borderColor: "#00aaff",
+                        width: "50px",
+                        height: "50px",
+                      }}
+                    >
+                      🔄
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
       {/* CÁC GIAO DIỆN KHÁC */}
       <canvas
@@ -687,9 +688,13 @@ const GameCanvas = () => {
             zIndex: 10,
           }}
         >
-          <h2 style={{ color: "lime", marginRight: "20px", margin: "5px 0" }}>
-            SHOOTING RANGE
-          </h2>
+          {/* Trên Mobile tôi ẩn chữ Shooting Range cho gọn gàng */}
+          {!isTouchDevice && (
+            <h2 style={{ color: "lime", marginRight: "20px", margin: "5px 0" }}>
+              SHOOTING RANGE
+            </h2>
+          )}
+
           {Object.keys(GAME_CONFIG.WEAPONS).map((wKey) => (
             <button
               key={wKey}
@@ -717,7 +722,7 @@ const GameCanvas = () => {
               borderRadius: "5px",
               cursor: "pointer",
               fontWeight: "bold",
-              marginLeft: "20px",
+              marginLeft: isTouchDevice ? "0" : "20px",
             }}
           >
             EXIT
