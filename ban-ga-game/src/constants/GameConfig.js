@@ -65,12 +65,13 @@ export const GAME_CONFIG = {
       name: "Dual SMG",
       damage: 0.5,
       cooldown: 5,
-      ammoMultiplier: 9, // Hệ số x9 (Mức Easy 20 đạn gốc -> 180 viên)
-      spreadAngle: 10, // Góc lệch 10 độ tạo thành hình chữ V hẹp cho 2 nòng súng
+      ammoMultiplier: 9, // Vẫn giữ 180 viên ở mức Easy
+      spreadAngle: 20, // Tăng độ giật của súng lên 20 độ
       color: "#00ffff",
-      bulletsPerShot: 2, // CƠ CHẾ: Bắn 2 viên mỗi lần bóp cò
+      bulletsPerShot: 2, // Bắn 2 viên 1 lần
       reloadMultiplier: 0.8,
       maxPierce: 1,
+      randomSpread: true, // <--- CƠ CHẾ MỚI: Đạn sẽ văng loạn xạ thay vì xếp thành đường thẳng
     },
     MACHINE_GUN: {
       name: "Machine Gun",

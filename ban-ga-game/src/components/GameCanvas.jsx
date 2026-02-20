@@ -100,6 +100,7 @@ const GameCanvas = () => {
     window.addEventListener("keyup", onKeyUp);
 
     const updatePhysics = () => {
+      // 1. CẬP NHẬT PLAYER & BẮN ĐẠN
       engine.players.forEach((p, idx) => {
         if (!p || p.markedForDeletion) return;
         const inputStr = idx === 0 ? "p1" : "p2";
@@ -111,10 +112,17 @@ const GameCanvas = () => {
           for (let i = 0; i < firedBulletsCount; i++) {
             let angleDeg = 0;
             if (weaponInfo.spreadAngle > 0) {
-              if (firedBulletsCount > 1) {
+              // CƠ CHẾ MỚI: Đạn văng loạn xạ ngẫu nhiên (Dành cho Dual SMG)
+              if (weaponInfo.randomSpread) {
+                angleDeg = (Math.random() - 0.5) * weaponInfo.spreadAngle;
+              }
+              // Bắn nhiều tia xếp hàng đều đặn (Dành cho Shotgun)
+              else if (firedBulletsCount > 1) {
                 const step = weaponInfo.spreadAngle / (firedBulletsCount - 1);
                 angleDeg = -weaponInfo.spreadAngle / 2 + step * i;
-              } else {
+              }
+              // Súng 1 viên nhưng có độ giật nhẹ (Machine Gun)
+              else {
                 angleDeg = (Math.random() - 0.5) * weaponInfo.spreadAngle;
               }
             }
@@ -145,6 +153,7 @@ const GameCanvas = () => {
         return;
       }
 
+      // 2. LOGIC SPAWN QUÁI / BOSS TRỰC TIẾP
       if (!isTestMode) {
         setScore((currentScore) => {
           if (currentScore >= GAME_CONFIG.SCORE_TO_BOSS && !engine.boss) {
@@ -211,6 +220,7 @@ const GameCanvas = () => {
       engine.bullets.forEach((b) => b.update());
       engine.enemies.forEach((e) => e.update(screenSize.height));
 
+      // 4. VA CHẠM (Xuyên thấu)
       engine.bullets.forEach((bullet) => {
         if (bullet.markedForDeletion) return;
         engine.enemies.forEach((enemy) => {
