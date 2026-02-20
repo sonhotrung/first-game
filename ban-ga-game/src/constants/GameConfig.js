@@ -62,14 +62,14 @@ export const GAME_CONFIG = {
       maxPierce: 3,
     },
     SMG: {
-      name: "SMG",
+      name: "Dual SMG",
       damage: 0.5,
       cooldown: 5,
-      ammoMultiplier: 12,
-      spreadAngle: 15,
+      ammoMultiplier: 9, // Hệ số x9 (Mức Easy 20 đạn gốc -> 180 viên)
+      spreadAngle: 10, // Góc lệch 10 độ tạo thành hình chữ V hẹp cho 2 nòng súng
       color: "#00ffff",
-      bulletsPerShot: 1,
-      reloadMultiplier: 1.5,
+      bulletsPerShot: 2, // CƠ CHẾ: Bắn 2 viên mỗi lần bóp cò
+      reloadMultiplier: 0.8,
       maxPierce: 1,
     },
     MACHINE_GUN: {
