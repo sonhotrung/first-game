@@ -63,7 +63,7 @@ export const GAME_CONFIG = {
     },
     SMG: {
       name: "Dual SMG",
-      damage: 0.5,
+      damage: 0.2,
       cooldown: 5,
       ammoMultiplier: 9, // Vẫn giữ 180 viên ở mức Easy
       spreadAngle: 20, // Tăng độ giật của súng lên 20 độ

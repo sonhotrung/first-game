@@ -32,7 +32,6 @@ const GameCanvas = () => {
   const [p2Weapon, setP2Weapon] = useState("DEFAULT");
   const [activeMode, setActiveMode] = useState("SINGLE");
 
-  // --- CÁC STATE CHO MOBILE CONTROLS ---
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [swapControls, setSwapControls] = useState(false);
 
@@ -100,7 +99,6 @@ const GameCanvas = () => {
     window.addEventListener("keyup", onKeyUp);
 
     const updatePhysics = () => {
-      // 1. CẬP NHẬT PLAYER & BẮN ĐẠN
       engine.players.forEach((p, idx) => {
         if (!p || p.markedForDeletion) return;
         const inputStr = idx === 0 ? "p1" : "p2";
@@ -112,17 +110,12 @@ const GameCanvas = () => {
           for (let i = 0; i < firedBulletsCount; i++) {
             let angleDeg = 0;
             if (weaponInfo.spreadAngle > 0) {
-              // CƠ CHẾ MỚI: Đạn văng loạn xạ ngẫu nhiên (Dành cho Dual SMG)
               if (weaponInfo.randomSpread) {
                 angleDeg = (Math.random() - 0.5) * weaponInfo.spreadAngle;
-              }
-              // Bắn nhiều tia xếp hàng đều đặn (Dành cho Shotgun)
-              else if (firedBulletsCount > 1) {
+              } else if (firedBulletsCount > 1) {
                 const step = weaponInfo.spreadAngle / (firedBulletsCount - 1);
                 angleDeg = -weaponInfo.spreadAngle / 2 + step * i;
-              }
-              // Súng 1 viên nhưng có độ giật nhẹ (Machine Gun)
-              else {
+              } else {
                 angleDeg = (Math.random() - 0.5) * weaponInfo.spreadAngle;
               }
             }
@@ -153,7 +146,6 @@ const GameCanvas = () => {
         return;
       }
 
-      // 2. LOGIC SPAWN QUÁI / BOSS TRỰC TIẾP
       if (!isTestMode) {
         setScore((currentScore) => {
           if (currentScore >= GAME_CONFIG.SCORE_TO_BOSS && !engine.boss) {
@@ -164,15 +156,22 @@ const GameCanvas = () => {
           if (!engine.boss) {
             engine.enemySpawnTimer++;
             if (engine.enemySpawnTimer > 60) {
+              // --- CẬP NHẬT: THÊM CẤP ĐỘ QUÁI 10 MÁU ---
               let spawnHp = 3;
-              let spawnColor = "#ff4444";
-              if (currentScore >= 6000 && currentScore < 8000) {
+              let spawnColor = "#ff4444"; // Đỏ
+              if (currentScore >= 4000 && currentScore < 7000) {
                 spawnHp = 5;
                 spawnColor = "#ffaa00";
-              } else if (currentScore >= 8000) {
+              } // Cam
+              else if (currentScore >= 7000 && currentScore < 9000) {
                 spawnHp = 8;
                 spawnColor = "#aa00ff";
-              }
+              } // Tím
+              else if (currentScore >= 9000) {
+                spawnHp = 10;
+                spawnColor = "#ff00ff";
+              } // Hồng đậm (10 Máu)
+
               engine.enemies.push(
                 new Enemy(
                   getRandomFloat(0, Math.max(0, screenSize.width - 30)),
@@ -220,7 +219,6 @@ const GameCanvas = () => {
       engine.bullets.forEach((b) => b.update());
       engine.enemies.forEach((e) => e.update(screenSize.height));
 
-      // 4. VA CHẠM (Xuyên thấu)
       engine.bullets.forEach((bullet) => {
         if (bullet.markedForDeletion) return;
         engine.enemies.forEach((enemy) => {
@@ -316,12 +314,14 @@ const GameCanvas = () => {
 
     if (mode === "TEST") {
       const diffConfig = GAME_CONFIG.DIFFICULTY[difficulty];
+      // TRUYỀN ẢNH VÀO LÚC TEST
       const p1 = new Player(
         screenSize.width / 2,
         screenSize.height,
         "#00ff00",
         "P1",
         diffConfig,
+        "/ship1.png",
       );
       engineState.current = {
         players: [p1],
@@ -343,12 +343,14 @@ const GameCanvas = () => {
 
   const startGame = () => {
     const diffConfig = GAME_CONFIG.DIFFICULTY[difficulty];
+    // TRUYỀN ẢNH VÀO KHI BẮT ĐẦU CHƠI
     const p1 = new Player(
       screenSize.width / 2 + 50,
       screenSize.height,
       "#00ff00",
       "P1",
       diffConfig,
+      "/ship1.png",
     );
     const p2 = new Player(
       screenSize.width / 2 - 90,
@@ -356,6 +358,7 @@ const GameCanvas = () => {
       "#00aaff",
       "P2",
       diffConfig,
+      "/ship2.png",
     );
     const activePlayers = activeMode === "SINGLE" ? [p1] : [p1, p2];
 
@@ -673,7 +676,6 @@ const GameCanvas = () => {
           </div>
         )}
 
-      {/* CÁC GIAO DIỆN KHÁC */}
       <canvas
         ref={canvasRef}
         width={screenSize.width}
@@ -698,7 +700,6 @@ const GameCanvas = () => {
             zIndex: 10,
           }}
         >
-          {/* Trên Mobile tôi ẩn chữ Shooting Range cho gọn gàng */}
           {!isTouchDevice && (
             <h2 style={{ color: "lime", marginRight: "20px", margin: "5px 0" }}>
               SHOOTING RANGE
@@ -1022,7 +1023,6 @@ const GameCanvas = () => {
         </div>
       )}
 
-      {/* MÀN HÌNH PAUSE: CÓ THÊM NÚT ĐỔI BÊN TAY CẦM CHO MOBILE */}
       {gameState === GAME_CONFIG.STATES.PAUSED && (
         <div style={overlayStyle}>
           <h1
@@ -1037,7 +1037,6 @@ const GameCanvas = () => {
             RESUME
           </button>
 
-          {/* Nút SWAP CONTROLS chỉ hiện trên điện thoại ở chế độ 1 Người */}
           {isTouchDevice && activeMode === "SINGLE" && (
             <button
               onClick={() => setSwapControls(!swapControls)}
@@ -1087,7 +1086,6 @@ const GameCanvas = () => {
   );
 };
 
-// CÁC STYLE CSS MẶC ĐỊNH
 const overlayStyle = {
   position: "absolute",
   top: 0,
@@ -1128,7 +1126,6 @@ const diffBtnStyle = {
   touchAction: "manipulation",
 };
 
-// STYLE RIÊNG CHO CÁC NÚT BẤM TRÊN MÀN HÌNH CẢM ỨNG
 const touchBtnStyle = {
   width: "65px",
   height: "65px",
